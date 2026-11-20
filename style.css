@@ -68,7 +68,7 @@ dl.kv{display:grid;grid-template-columns:max-content 1fr;gap:2px 12px;margin:6px
 .cards b{display:block;font-size:15px}.cards span{font-size:12px;color:var(--muted)}
 .fronttree ul{padding-left:18px}
 ul.cols{columns:3 220px;column-gap:24px}
-.mapw{max-width:640px}
+.mapw{max-width:640px}.mapw.mini{max-width:360px}.mapf .pt.x{background:#ffd43b;width:13px;height:13px;margin:-6.5px 0 0 -6.5px}
 .mapf{position:relative;width:100%;aspect-ratio:1/1;background:#2a2620;border:1px solid var(--line);border-radius:4px;overflow:hidden}
 .mapf img{width:100%;height:100%;display:block;image-rendering:auto}
 .mapf .pt{position:absolute;width:9px;height:9px;margin:-4.5px 0 0 -4.5px;border-radius:50%;border:1px solid #000;box-shadow:0 0 2px rgba(0,0,0,.6)}
