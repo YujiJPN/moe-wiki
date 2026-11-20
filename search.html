@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>検索 - MoE Wiki データ版</title><link rel="stylesheet" href="style.css"></head>
+<body>
+<header><div class="hr"><button class="mt" id="mt" type="button" aria-label="メニュー">☰</button><a class="site" href="index.html">MoE Wiki データ版</a>
+<form class="sf" action="search.html" autocomplete="off"><input name="q" id="sq" type="search" placeholder="検索（日本語・英語）  /"><button>検索</button><div class="sd" id="sd"></div></form></div>
+<nav class="cats" id="cats"></nav></header>
+<div class="wrap"><nav class="menu" id="menu"></nav><script src="menu.js"></script>
+<main><h1>検索</h1>
+<div id="kinds"></div><div id="res">読み込み中…</div>
+</main></div>
+<script src="search-index.js"></script>
+<script src="site.js"></script>
+<script>
+(function(){
+  var P=new URLSearchParams(location.search), q=P.get('q')||'', kind=P.get('k')||'';
+  document.getElementById('sq').value=q;
+  var res=document.getElementById('res'), kinds=document.getElementById('kinds');
+  if(!q.trim()){res.textContent='キーワードを入力してください。';return;}
+  var hits=WSEARCH(q,0);
+  var by={};hits.forEach(function(r){by[r[2]]=(by[r[2]]||0)+1});
+  var link=function(k,label){return '<a class="kind'+(k===kind?' on':'')+'" href="search.html?q='+encodeURIComponent(q)+(k?'&k='+encodeURIComponent(k):'')+'">'+label+'</a>'};
+  kinds.innerHTML=link('', 'すべて '+hits.length)+' '+Object.keys(by).map(function(k){return link(k,k+' '+by[k])}).join(' ');
+  if(kind)hits=hits.filter(function(r){return r[2]===kind});
+  res.innerHTML='<ul class="hits">'+hits.slice(0,1000).map(function(r){
+    return '<li><span class="kind">'+r[2]+'</span><a href="'+r[1]+'">'+WESC(r[0])+'</a>'+(r[3]?' <small>'+WESC(r[3])+'</small>':'')+'</li>'}).join('')+'</ul>'+(hits.length>1000?'<p>先頭 1000 件を表示（種類で絞り込めます）</p>':'');
+})();
+</script>
+</body></html>
