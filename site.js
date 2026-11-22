@@ -40,11 +40,27 @@ document.querySelectorAll('table.t').forEach(function(t){
   // the 追加効果 column of the item lists: a choice of one bonus keeps the rows that have it, highest value first
   var bcol = -1;
   t.querySelectorAll('thead th').forEach(function(th, i){ if (th.textContent.trim() === '追加効果') bcol = i; });
-  if (n >= 25 || bcol >= 0) {
+  // effect marks (span.fx, the buff list): a choice of one effect keeps the rows that have it, grouped as marked
+  var hasfx = !!tb.querySelector('span.fx');
+  if (n >= 25 || bcol >= 0 || hasfx) {
     var box = document.createElement('div'); box.className = 'tf';
     box.innerHTML = '<input type="search" placeholder="表を絞り込む（日本語・英語・数字）"><span>' + n + ' 件</span>';
     t.parentNode.insertBefore(box, t);
-    var inp = box.firstChild, cnt = box.lastChild, keys = null, timer = 0, sel = null, bon = null, order = null;
+    var inp = box.firstChild, cnt = box.lastChild, keys = null, timer = 0, sel = null, bon = null, order = null, fsel = null, fxk = null;
+    if (hasfx) {
+      fxk = new Map(); var fseen = {}, fgrp = {}, gord = {};
+      [].forEach.call(tb.rows, function(r){ var ks = {};
+        r.querySelectorAll('span.fx').forEach(function(sp){ var k = sp.dataset.k, g = sp.dataset.g; if (ks[k]) return; ks[k] = 1;
+          fseen[k] = (fseen[k] || 0) + 1; fgrp[k] = g; gord[g] = +sp.dataset.o; });
+        fxk.set(r, ks); });
+      var gs = Object.keys(gord).sort(function(a, b){ return gord[a] - gord[b]; });
+      fsel = document.createElement('select');
+      var fh = '<option value="">効果で絞り込む（すべて）</option>';
+      gs.forEach(function(g){ var ks = Object.keys(fseen).filter(function(k){ return fgrp[k] === g; })
+          .sort(function(a, b){ return fseen[b] - fseen[a] || a.localeCompare(b, 'ja'); });
+        fh += '<optgroup label="' + esc(g) + '">' + ks.map(function(k){ return '<option value="' + esc(k) + '">' + esc(k) + '（' + fseen[k] + '）</option>'; }).join('') + '</optgroup>'; });
+      fsel.innerHTML = fh; box.insertBefore(fsel, cnt);
+    }
     if (bcol >= 0) {
       bon = new Map(); var seen = {};
       var low = function(k){ return /ディレイ/.test(k); };            // a delay bonus helps when it is below 0
@@ -69,15 +85,16 @@ document.querySelectorAll('table.t').forEach(function(t){
     }
     var apply = function(){
       if (!keys) { keys = new Map(); [].forEach.call(tb.rows, function(r){ keys.set(r, norm(r.textContent)); }); }
-      var q = norm(inp.value), b = sel ? sel.value : '', k = 0;
+      var q = norm(inp.value), b = sel ? sel.value : '', f = fsel ? fsel.value : '', k = 0;
       if (sel) { var rs = order.slice(), sg = b && low(b) ? -1 : 1; if (b) rs.sort(function(x, y){ var vx = bon.get(x)[b], vy = bon.get(y)[b];
           return (vy === undefined ? -1e18 : sg * vy) - (vx === undefined ? -1e18 : sg * vx); });
         rs.forEach(function(r){ tb.appendChild(r); }); }
-      [].forEach.call(tb.rows, function(r){ var ok = (!q || keys.get(r).indexOf(q) >= 0) && (!b || good(b, bon.get(r)[b]));
+      [].forEach.call(tb.rows, function(r){ var ok = (!q || keys.get(r).indexOf(q) >= 0) && (!b || good(b, bon.get(r)[b])) && (!f || fxk.get(r)[f]);
         r.style.display = ok ? '' : 'none'; if (ok) k++; });
-      cnt.textContent = (q || b) ? (k + ' / ' + n + ' 件') : (n + ' 件'); };
+      cnt.textContent = (q || b || f) ? (k + ' / ' + n + ' 件') : (n + ' 件'); };
     inp.addEventListener('input', function(){ clearTimeout(timer); timer = setTimeout(apply, 120); });
     if (sel) sel.addEventListener('change', apply);
+    if (fsel) fsel.addEventListener('change', apply);
   }
 });
 if (main) document.querySelectorAll('main table').forEach(function(t){
