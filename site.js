@@ -46,20 +46,26 @@ document.querySelectorAll('table.t').forEach(function(t){
     var box = document.createElement('div'); box.className = 'tf';
     box.innerHTML = '<input type="search" placeholder="表を絞り込む（日本語・英語・数字）"><span>' + n + ' 件</span>';
     t.parentNode.insertBefore(box, t);
-    var inp = box.firstChild, cnt = box.lastChild, keys = null, timer = 0, sel = null, bon = null, order = null, fsel = null, fxk = null;
+    var inp = box.firstChild, cnt = box.lastChild, keys = null, timer = 0, sel = null, bon = null, order = null, fsels = [], fxk = null;
     if (hasfx) {
-      fxk = new Map(); var fseen = {}, fgrp = {}, gord = {};
+      // one choice per kind of mark (data-s: 効果, 装備スロット ...); data-g = group of the option ('' = none), data-o =
+      // order of the group, or of the option when it has no group
+      fxk = new Map(); var F = {};
       [].forEach.call(tb.rows, function(r){ var ks = {};
-        r.querySelectorAll('span.fx').forEach(function(sp){ var k = sp.dataset.k, g = sp.dataset.g; if (ks[k]) return; ks[k] = 1;
-          fseen[k] = (fseen[k] || 0) + 1; fgrp[k] = g; gord[g] = +sp.dataset.o; });
+        r.querySelectorAll('span.fx').forEach(function(sp){ var s = sp.dataset.s || '効果', k = sp.dataset.k, v = s + '\u0001' + k;
+          if (ks[v]) return; ks[v] = 1;
+          var f = F[s] || (F[s] = {seen: {}, grp: {}, ord: {}, gord: {}, so: +(sp.dataset.so || 0)});
+          var g = sp.dataset.g || ''; f.seen[k] = (f.seen[k] || 0) + 1; f.grp[k] = g;
+          if (g) f.gord[g] = +sp.dataset.o; else f.ord[k] = +sp.dataset.o; });
         fxk.set(r, ks); });
-      var gs = Object.keys(gord).sort(function(a, b){ return gord[a] - gord[b]; });
-      fsel = document.createElement('select');
-      var fh = '<option value="">効果で絞り込む（すべて）</option>';
-      gs.forEach(function(g){ var ks = Object.keys(fseen).filter(function(k){ return fgrp[k] === g; })
-          .sort(function(a, b){ return fseen[b] - fseen[a] || a.localeCompare(b, 'ja'); });
-        fh += '<optgroup label="' + esc(g) + '">' + ks.map(function(k){ return '<option value="' + esc(k) + '">' + esc(k) + '（' + fseen[k] + '）</option>'; }).join('') + '</optgroup>'; });
-      fsel.innerHTML = fh; box.insertBefore(fsel, cnt);
+      Object.keys(F).sort(function(a, b){ return F[a].so - F[b].so; }).forEach(function(s){ var f = F[s];
+        var opt = function(k){ return '<option value="' + esc(s + '\u0001' + k) + '">' + esc(k) + '（' + f.seen[k] + '）</option>'; };
+        var byCount = function(a, b){ return f.seen[b] - f.seen[a] || a.localeCompare(b, 'ja'); };
+        var h = '<option value="">' + esc(s) + 'で絞り込む（すべて）</option>';
+        Object.keys(f.gord).sort(function(a, b){ return f.gord[a] - f.gord[b]; }).forEach(function(g){
+          h += '<optgroup label="' + esc(g) + '">' + Object.keys(f.seen).filter(function(k){ return f.grp[k] === g; }).sort(byCount).map(opt).join('') + '</optgroup>'; });
+        h += Object.keys(f.seen).filter(function(k){ return !f.grp[k]; }).sort(function(a, b){ return f.ord[a] - f.ord[b] || byCount(a, b); }).map(opt).join('');
+        var e = document.createElement('select'); e.innerHTML = h; box.insertBefore(e, cnt); fsels.push(e); });
     }
     if (bcol >= 0) {
       bon = new Map(); var seen = {};
@@ -85,16 +91,16 @@ document.querySelectorAll('table.t').forEach(function(t){
     }
     var apply = function(){
       if (!keys) { keys = new Map(); [].forEach.call(tb.rows, function(r){ keys.set(r, norm(r.textContent)); }); }
-      var q = norm(inp.value), b = sel ? sel.value : '', f = fsel ? fsel.value : '', k = 0;
+      var q = norm(inp.value), b = sel ? sel.value : '', fs = fsels.map(function(e){ return e.value; }).filter(Boolean), k = 0;
       if (sel) { var rs = order.slice(), sg = b && low(b) ? -1 : 1; if (b) rs.sort(function(x, y){ var vx = bon.get(x)[b], vy = bon.get(y)[b];
           return (vy === undefined ? -1e18 : sg * vy) - (vx === undefined ? -1e18 : sg * vx); });
         rs.forEach(function(r){ tb.appendChild(r); }); }
-      [].forEach.call(tb.rows, function(r){ var ok = (!q || keys.get(r).indexOf(q) >= 0) && (!b || good(b, bon.get(r)[b])) && (!f || fxk.get(r)[f]);
+      [].forEach.call(tb.rows, function(r){ var ok = (!q || keys.get(r).indexOf(q) >= 0) && (!b || good(b, bon.get(r)[b])) && fs.every(function(v){ return fxk.get(r)[v]; });
         r.style.display = ok ? '' : 'none'; if (ok) k++; });
-      cnt.textContent = (q || b || f) ? (k + ' / ' + n + ' 件') : (n + ' 件'); };
+      cnt.textContent = (q || b || fs.length) ? (k + ' / ' + n + ' 件') : (n + ' 件'); };
     inp.addEventListener('input', function(){ clearTimeout(timer); timer = setTimeout(apply, 120); });
     if (sel) sel.addEventListener('change', apply);
-    if (fsel) fsel.addEventListener('change', apply);
+    fsels.forEach(function(e){ e.addEventListener('change', apply); });
   }
 });
 if (main) document.querySelectorAll('main table').forEach(function(t){
