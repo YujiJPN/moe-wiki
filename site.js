@@ -37,16 +37,47 @@ document.querySelectorAll('table.t').forEach(function(t){
       return x.localeCompare(y, 'ja') * dir; });
     rows.forEach(function(r){ tb.appendChild(r); }); }); });
   var n = tb.rows.length;
-  if (n >= 25) {
+  // the 追加効果 column of the item lists: a choice of one bonus keeps the rows that have it, highest value first
+  var bcol = -1;
+  t.querySelectorAll('thead th').forEach(function(th, i){ if (th.textContent.trim() === '追加効果') bcol = i; });
+  if (n >= 25 || bcol >= 0) {
     var box = document.createElement('div'); box.className = 'tf';
     box.innerHTML = '<input type="search" placeholder="表を絞り込む（日本語・英語・数字）"><span>' + n + ' 件</span>';
     t.parentNode.insertBefore(box, t);
-    var inp = box.firstChild, cnt = box.lastChild, keys = null, timer = 0;
-    inp.addEventListener('input', function(){ clearTimeout(timer); timer = setTimeout(function(){
+    var inp = box.firstChild, cnt = box.lastChild, keys = null, timer = 0, sel = null, bon = null, order = null;
+    if (bcol >= 0) {
+      bon = new Map(); var seen = {};
+      var low = function(k){ return /ディレイ/.test(k); };            // a delay bonus helps when it is below 0
+      var good = function(k, v){ return v !== undefined && (low(k) ? v < 0 : v > 0); };
+      [].forEach.call(tb.rows, function(r){ var m = {}, c = r.cells[bcol];
+        if (c) c.innerHTML.split(/<br\s*\/?>/i).forEach(function(line){
+          var s = line.replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/\(非表示\)/, '').trim();
+          var mm = s.match(/^(.*\S)\s+([+\-−]?\d[\d.,]*)/); if (!mm) return;
+          var v = parseFloat(mm[2].replace('−', '-').replace(/,/g, '')); m[mm[1]] = (m[mm[1]] || 0) + v; });
+        Object.keys(m).forEach(function(k){ if (good(k, m[k])) seen[k] = (seen[k] || 0) + 1; });
+        bon.set(r, m); });
+      var grp = function(k){ return /^耐.属性$/.test(k) ? '属性耐性' : /ゲージ|ヒットゾーン|グレードゾーン|グレードUP|アイテム強化|釣り|泳ぎ/.test(k) ? '生産・釣り'
+        : /補正|キルカウント/.test(k) ? '技の補正' : '能力値'; };
+      var G = {'能力値': [], '属性耐性': [], '技の補正': [], '生産・釣り': []};
+      Object.keys(seen).sort(function(a, b){ return seen[b] - seen[a]; }).forEach(function(k){ G[grp(k)].push(k); });
+      sel = document.createElement('select');
+      var h = '<option value="">追加効果で絞り込む（すべて）</option>';
+      Object.keys(G).forEach(function(g){ if (!G[g].length) return; h += '<optgroup label="' + g + '">' +
+        G[g].map(function(k){ return '<option value="' + esc(k) + '">' + esc(k) + '（' + seen[k] + '）</option>'; }).join('') + '</optgroup>'; });
+      sel.innerHTML = h; box.insertBefore(sel, cnt);
+      order = [].slice.call(tb.rows);
+    }
+    var apply = function(){
       if (!keys) { keys = new Map(); [].forEach.call(tb.rows, function(r){ keys.set(r, norm(r.textContent)); }); }
-      var q = norm(inp.value), k = 0;
-      [].forEach.call(tb.rows, function(r){ var ok = !q || keys.get(r).indexOf(q) >= 0; r.style.display = ok ? '' : 'none'; if (ok) k++; });
-      cnt.textContent = q ? (k + ' / ' + n + ' 件') : (n + ' 件'); }, 120); });
+      var q = norm(inp.value), b = sel ? sel.value : '', k = 0;
+      if (sel) { var rs = order.slice(), sg = b && low(b) ? -1 : 1; if (b) rs.sort(function(x, y){ var vx = bon.get(x)[b], vy = bon.get(y)[b];
+          return (vy === undefined ? -1e18 : sg * vy) - (vx === undefined ? -1e18 : sg * vx); });
+        rs.forEach(function(r){ tb.appendChild(r); }); }
+      [].forEach.call(tb.rows, function(r){ var ok = (!q || keys.get(r).indexOf(q) >= 0) && (!b || good(b, bon.get(r)[b]));
+        r.style.display = ok ? '' : 'none'; if (ok) k++; });
+      cnt.textContent = (q || b) ? (k + ' / ' + n + ' 件') : (n + ' 件'); };
+    inp.addEventListener('input', function(){ clearTimeout(timer); timer = setTimeout(apply, 120); });
+    if (sel) sel.addEventListener('change', apply);
   }
 });
 if (main) document.querySelectorAll('main table').forEach(function(t){
