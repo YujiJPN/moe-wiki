@@ -99,6 +99,7 @@
         var sp = [];
         if (x.it.src) { var t = srcHtml(x.it.src); if (t) sp.push(t); }
         if (x.it.s) sp.push('生産：' + a('レシピ', x.it.s.ru) + ' ' + skills(x.it.s.k));
+        else if (x.it.src && x.it.src.m) sp.push('生産でも作れる');
         return '<tr><td>' + link(x.it) + '</td><td>' + fmt(x.c) + '</td><td>' + (sp.join(' ／ ') || '') + '</td></tr>';
       }).join('') + '</tbody></table>';
       var cr = Object.keys(crafts).map(function (k) { return crafts[k]; });
