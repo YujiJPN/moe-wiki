@@ -105,6 +105,7 @@
           if (!m) r.notes.push(['bad', D.t.no_bracket]);
           else if (m[1] && !TECH[m[1].toLowerCase()]) r.notes.push(['warn', D.t.no_tech.split('%s').join(m[1])]);
         }
+        if (c[0] === 'targetcps') r.notes.push(['warn', D.t.loot]);
         if (c[0] === 'useitem' || c[0] === 'equipitem') {
           var mi = /^\[([^\]]*)\]/.exec(arg);
           if (mi && mi[1] && !anyItem(mi[1], c[0] === 'useitem' ? D.use : D.equip)) r.notes.push(['warn', D.t.no_item.replace('%s', mi[1])]);
@@ -221,6 +222,17 @@
       else if (v === 'chat') { f.opt = sel(D.chat, 'mc-o'); f.to = input('mc-to', D.t.tell_ph); f.text = input('mc-txt', D.t.text_ph); }
       else if (v === 'emote') { f.opt = sel(D.emote, 'mc-o'); }
       else if (v === 'toggle') { f.opt = sel(D.toggles, 'mc-o'); f.on = sel([['on', 'on'], ['off', 'off'], ['', D.t.toggle_flip]], 'mc-o2'); }
+      else if (v === 'any') {
+        f.opt = mk('select', 'mc-o');
+        D.allcmd.forEach(function (g) {
+          var og = document.createElement('optgroup'); og.label = g[0];
+          g[1].forEach(function (c) { var o = mk('option', null, c[1]); o.value = c[0]; o.setAttribute('data-u', c[2]); og.appendChild(o); });
+          f.opt.appendChild(og);
+        });
+        f.arg = input('mc-txt', D.t.args_ph);
+        var hint = function () { var o = f.opt.options[f.opt.selectedIndex]; f.arg.placeholder = (o && o.getAttribute('data-u')) || D.t.args_ph; };
+        f.opt.addEventListener('change', hint); hint();
+      }
       else if (v === 'free') { f.text = input('mc-free', D.t.free_ph); }
       Object.keys(f).forEach(function (n) { p.appendChild(f[n]); });
       if (f.to) { f.to.hidden = f.opt.value !== 'tell'; f.opt.addEventListener('change', function () { f.to.hidden = f.opt.value !== 'tell'; }); }
@@ -244,6 +256,7 @@
       }
       if (v === 'chat') { var x = f.text.value; if (f.opt.value === 'tell') return '/tell ' + f.to.value.trim() + ' ' + x; return f.opt.value + ' ' + x; }
       if (v === 'toggle') return f.opt.value + (f.on.value ? ' ' + f.on.value : '');
+      if (v === 'any') { var ag = f.arg.value.trim(); return '/' + f.opt.value + (ag ? ' ' + ag : ''); }
       if (v === 'free') return f.text.value;
       return '';
     };
