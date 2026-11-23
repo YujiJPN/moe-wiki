@@ -16,7 +16,8 @@
     st.textContent = '.cc-tree ul{list-style:none;margin:2px 0 2px 1.1em;padding-left:.8em;border-left:1px dashed var(--line)}' +
       '.cc-tree>ul{margin-left:0;padding-left:0;border-left:0}.cc-tree li{margin:3px 0}' +
       '.cc-tree .cc-src{color:var(--muted);font-size:90%;margin-left:.4em}.cc-tree .cc-cnt{font-weight:bold}' +
-      '.cc-tree summary{cursor:pointer}.cc-tree .cc-k{font-size:90%}';
+      '.cc-tree summary{cursor:pointer}.cc-tree .cc-k{font-size:90%}' +
+      '.cc-copy{margin-top:8px}.cc-line{margin:3px 0}.cc-line code{white-space:pre-wrap;word-break:break-all}.cc-cp{font-size:90%}';
     document.head.appendChild(st);
   }
 
@@ -33,6 +34,42 @@
     return p.join(' ／ ');
   }
   function skills(k) { return k.map(function (x) { return esc(x[0]) + ' ' + x[1]; }).join(' / '); }
+
+  // ---- text for the game's chat: the chat bar's edit box holds 180 bytes (client 0x45683b: push 0xb4); the client
+  // writes Shift_JIS, 1 byte for ASCII and half-width kana, 2 for the rest. Lines stay at 178 so a closing byte fits.
+  var CHAT_BYTES = 178;
+  function sjisLen(s) {
+    var n = 0;
+    for (var i = 0; i < s.length; i++) {
+      var c = s.charCodeAt(i);
+      n += (c < 0x80 || (c >= 0xff61 && c <= 0xff9f)) ? 1 : 2;
+    }
+    return n;
+  }
+  function chatLines(head, parts) {
+    var out = [], cur = head, sep = '';
+    parts.forEach(function (p) {
+      if (sjisLen(cur + sep + p) > CHAT_BYTES - 6 && cur !== head) { out.push(cur); cur = ''; sep = ''; }
+      cur += sep + p; sep = '、';
+    });
+    out.push(cur);
+    return out.length > 1 ? out.map(function (l, i) { return '(' + (i + 1) + '/' + out.length + ')' + l; }) : out;
+  }
+  function copyText(t, btn) {
+    function done() { var o = btn.textContent; btn.textContent = 'コピーしました'; setTimeout(function () { btn.textContent = o; }, 1200); }
+    function fallback() {
+      var ta = document.createElement('textarea');
+      ta.value = t; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select();
+      var ok = false;
+      try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+      if (ok) done();
+      else { var o = btn.textContent; btn.textContent = 'コピーできませんでした（文字を選んでコピーしてください）'; setTimeout(function () { btn.textContent = o; }, 2500); }
+      document.body.removeChild(ta);
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(done, fallback);
+    else fallback();
+  }
 
   document.querySelectorAll('.cc').forEach(function (box) {
     var data = JSON.parse(box.querySelector('.cc-data').textContent);
@@ -110,8 +147,21 @@
       if (tl.length) h += '<p>道具（消費しない）：' + tl.map(function (t) {
         return link(t.it) + ' ×' + t.c + (t.wear ? '（耐久度 −' + fmt(t.wear) + '）' : '');
       }).join('、') + '</p>';
+      lines = rows.length ? chatLines((data.p || 'このレシピ') + (data.q ? '×' + sets * data.q : ' ' + sets + 'セット') + 'の材料：',
+                                      rows.map(function (x) { return x.it.n + '×' + x.c; })) : [];
+      if (lines.length) h += '<div class="cc-copy"><p><b>ゲームに送る用</b>（チャットの入力欄は 180 バイト、全角 90 文字まで。' +
+        '長いときは行を分けた）</p>' + lines.map(function (l, i) {
+          return '<div class="cc-line"><button type="button" class="cc-cp" data-i="' + i + '">コピー</button> <code>' + esc(l) + '</code></div>';
+        }).join('') + (lines.length > 1 ? '<p><button type="button" class="cc-cp" data-i="all">全部コピー（1 行ずつ改行で区切る）</button></p>' : '') +
+        '</div>';
       out.innerHTML = h;
     }
+    var lines = [];
+    box.addEventListener('click', function (ev) {
+      var b = ev.target.closest && ev.target.closest('.cc-cp');
+      if (!b) return;
+      copyText(b.getAttribute('data-i') === 'all' ? lines.join('\n') : lines[+b.getAttribute('data-i')] || '', b);
+    });
     num.addEventListener('input', update); mode.addEventListener('change', update); deep.addEventListener('change', update);
     update();
   });
